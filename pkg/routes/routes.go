@@ -18,8 +18,4 @@ func Setup(app *fiber.App) {
 	app.Get("/getReport/:id", controllers.GetStudentReport)
 	app.Get("/getAllReport", controllers.GetAllStudentReports)
 
-
-
-	}
-	
-
+}

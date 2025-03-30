@@ -2,65 +2,64 @@ package controllers
 
 import (
 	"database/sql"
+	"fmt"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gofiber/fiber/v2"
 	"github.com/kavikkannan/go-ecommerce-grocery-delivery-service/pkg/config"
 	"golang.org/x/crypto/bcrypt"
+	"log"
 	"strconv"
 	"time"
-	"fmt"
-	"log"
-
 )
 
 const SecretKey = "secret"
 
 func Register(c *fiber.Ctx) error {
-    var data map[string]interface{} 
+	var data map[string]interface{}
 
-    if err := c.BodyParser(&data); err != nil {
-        return err
-    }
+	if err := c.BodyParser(&data); err != nil {
+		return err
+	}
 
-    passwordStr, ok := data["password"].(string)
-    if !ok || passwordStr == "" {
-        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Password is required"})
-    }
-    password, _ := bcrypt.GenerateFromPassword([]byte(passwordStr), 14)
+	passwordStr, ok := data["password"].(string)
+	if !ok || passwordStr == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Password is required"})
+	}
+	password, _ := bcrypt.GenerateFromPassword([]byte(passwordStr), 14)
 
-    isAdmin := false
-    if val, ok := data["is_admin"].(bool); ok {
-        isAdmin = val
-    } else if val, ok := data["is_admin"].(string); ok && val == "true" {
-        isAdmin = true
-    }
+	isAdmin := false
+	if val, ok := data["is_admin"].(bool); ok {
+		isAdmin = val
+	} else if val, ok := data["is_admin"].(string); ok && val == "true" {
+		isAdmin = true
+	}
 
-    noOfFiles := 0
-    switch v := data["no_of_files"].(type) {
-    case string:
-        noOfFiles, _ = strconv.Atoi(v)
-    case float64:
-        noOfFiles = int(v)
-    }
+	noOfFiles := 0
+	switch v := data["no_of_files"].(type) {
+	case string:
+		noOfFiles, _ = strconv.Atoi(v)
+	case float64:
+		noOfFiles = int(v)
+	}
 
-    role, ok := data["role"].(string)
-    if !ok || role == "" {
-        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Role is required"})
-    }
+	role, ok := data["role"].(string)
+	if !ok || role == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Role is required"})
+	}
 
-    appointedMembersStr := ""
+	appointedMembersStr := ""
 
-	reportto :=1
-    
-    _, err := config.DB.Exec(
-        "INSERT INTO Login (name, email, password, number, is_admin, no_of_files, role, appointed_members, reportTo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        data["name"], data["email"], password, data["number"], isAdmin, noOfFiles, role, appointedMembersStr,reportto )
+	reportto := 1
 
-    if err != nil {
-        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Failed to register user", "error": err.Error()})
-    }
+	_, err := config.DB.Exec(
+		"INSERT INTO Login (name, email, password, number, is_admin, no_of_files, role, appointed_members, reportTo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		data["name"], data["email"], password, data["number"], isAdmin, noOfFiles, role, appointedMembersStr, reportto)
 
-    return c.JSON(fiber.Map{"message": "User registered successfully"})
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Failed to register user", "error": err.Error()})
+	}
+
+	return c.JSON(fiber.Map{"message": "User registered successfully"})
 }
 
 func Login(c *fiber.Ctx) error {
@@ -78,7 +77,7 @@ func Login(c *fiber.Ctx) error {
 	if err == sql.ErrNoRows {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "User not found"})
 	} else if err != nil {
-		fmt.Println("Database error:", err) 
+		fmt.Println("Database error:", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Database error"})
 	}
 
@@ -87,13 +86,13 @@ func Login(c *fiber.Ctx) error {
 	}
 
 	claims := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"Issuer":   strconv.Itoa(id),
-		"Expires":  time.Now().Add(time.Hour * 24).Unix(),
-		"IsAdmin":  isAdmin,
+		"Issuer":  strconv.Itoa(id),
+		"Expires": time.Now().Add(time.Hour * 24).Unix(),
+		"IsAdmin": isAdmin,
 	})
 	token, err := claims.SignedString([]byte(SecretKey))
 	if err != nil {
-		fmt.Println("JWT signing error:", err) 
+		fmt.Println("JWT signing error:", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Could not login"})
 	}
 
@@ -112,59 +111,58 @@ func Login(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"message": "Login successful"})
 }
 
-
 func User(c *fiber.Ctx) error {
-    cookie := c.Cookies("jwt")
-	
-    token, err := jwt.ParseWithClaims(cookie, jwt.MapClaims{}, func(token *jwt.Token) (interface{}, error) {
-        return []byte(SecretKey), nil
-    })
-    if err != nil {
-        return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"message": "Unauthenticated"})
-    }
+	cookie := c.Cookies("jwt")
 
-    claims, ok := token.Claims.(jwt.MapClaims)
-    if !ok || claims["Issuer"] == nil {
-        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Invalid claims in token"})
-    }
-
-    userId, err := strconv.Atoi(claims["Issuer"].(string))
-    if err != nil {
-        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Invalid user ID in token"})
-    }
-
-    var user struct {
-		ID    int
-		Name  string
-		Email string
-		Number string
-		IsAdmin bool
-		PPass string
-		NoOfFiles int
-		Role string
+	token, err := jwt.ParseWithClaims(cookie, jwt.MapClaims{}, func(token *jwt.Token) (interface{}, error) {
+		return []byte(SecretKey), nil
+	})
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"message": "Unauthenticated"})
 	}
 
-    err = config.DB.QueryRow("SELECT id, name, email, number, is_admin, password ,no_of_files ,role FROM Login WHERE id = ?", userId).Scan(&user.ID, &user.Name, &user.Email, &user.Number, &user.IsAdmin, &user.PPass, &user.NoOfFiles, &user.Role)
-    if err == sql.ErrNoRows {
-        return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "User not found"})
-    } else if err != nil {
-        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Database error"})
-    }
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok || claims["Issuer"] == nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Invalid claims in token"})
+	}
 
-    return c.JSON(user)
+	userId, err := strconv.Atoi(claims["Issuer"].(string))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Invalid user ID in token"})
+	}
+
+	var user struct {
+		ID        int
+		Name      string
+		Email     string
+		Number    string
+		IsAdmin   bool
+		PPass     string
+		NoOfFiles int
+		Role      string
+	}
+
+	err = config.DB.QueryRow("SELECT id, name, email, number, is_admin, password ,no_of_files ,role FROM Login WHERE id = ?", userId).Scan(&user.ID, &user.Name, &user.Email, &user.Number, &user.IsAdmin, &user.PPass, &user.NoOfFiles, &user.Role)
+	if err == sql.ErrNoRows {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "User not found"})
+	} else if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Database error"})
+	}
+
+	return c.JSON(user)
 }
 
 func GetUserByID(c *fiber.Ctx) error {
 	userID := c.Params("userId")
 	var user struct {
-		ID    int
-		Name  string
-		Email string
-		Number string
-		IsAdmin bool
-		PPass string
+		ID        int
+		Name      string
+		Email     string
+		Number    string
+		IsAdmin   bool
+		PPass     string
 		NoOfFiles int
-		Role string
+		Role      string
 	}
 
 	err := config.DB.QueryRow("SELECT id, name, email, number, is_admin, password ,no_of_files ,role FROM Login WHERE id = ?", userID).
@@ -202,14 +200,14 @@ func SetReport(c *fiber.Ctx) error {
 		INSERT INTO Student (name, age, gender, grade, jaundice, prediction, asd_confidence, video_confidence, final_confidence) 
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
 
-	_, err := config.DB.Exec(query, 
-		data["name"], 
-		data["age"], 
-		data["gender"], 
-		data["grade"], 
+	_, err := config.DB.Exec(query,
+		data["name"],
+		data["age"],
+		data["gender"],
+		data["grade"],
 		data["jaundice"],
-		data["prediction"], 
-		data["asd_confidence"], 
+		data["prediction"],
+		data["asd_confidence"],
 		data["video_confidence"],
 		data["final_confidence"],
 	)
@@ -222,22 +220,21 @@ func SetReport(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"message": "Data inserted successfully"})
 }
 
-
 func GetStudentReport(c *fiber.Ctx) error {
 	index := c.Params("id")
 	var Report struct {
-		Id int
-		Name string
-		Age string
-		Gender string
-		Grade string
-		Jaundice string
-		Prediction string
-		Asd_confidence string
+		Id               int
+		Name             string
+		Age              string
+		Gender           string
+		Grade            string
+		Jaundice         string
+		Prediction       string
+		Asd_confidence   string
 		Video_confidence string
 		Final_confidence string
 	}
-	err := config.DB.QueryRow("SELECT  id, name, age, gender, grade, prediction, asd_confidence, video_confidence, final_confidence FROM Student WHERE id = ?", index).Scan( &Report.Id, &Report.Name,&Report.Age, &Report.Gender,&Report.Grade,&Report.Prediction,&Report.Asd_confidence,&Report.Video_confidence,&Report.Final_confidence)
+	err := config.DB.QueryRow("SELECT  id, name, age, gender, grade, prediction, asd_confidence, video_confidence, final_confidence FROM Student WHERE id = ?", index).Scan(&Report.Id, &Report.Name, &Report.Age, &Report.Gender, &Report.Grade, &Report.Prediction, &Report.Asd_confidence, &Report.Video_confidence, &Report.Final_confidence)
 	if err == sql.ErrNoRows {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Eindex not found"})
 	} else if err != nil {
@@ -257,29 +254,28 @@ func GetCaseById(c *fiber.Ctx) error {
 	defer rows.Close()
 
 	var Cases []struct {
-		PIndex     string
-		PFile string
-		PIV string
-		Name string
-		Status string
-		AgentId string
+		PIndex           string
+		PFile            string
+		PIV              string
+		Name             string
+		Status           string
+		AgentId          string
 		CoustomerDetails string
-		Unknown1 string
+		Unknown1         string
 	}
 
 	for rows.Next() {
 		var Case struct {
-		PIndex     string
-		PFile string
-		PIV string
-		Name string
-		Status string
-		AgentId string
-		CoustomerDetails string
-		Unknown1 string
-
-	}
-		if err := rows.Scan( &Case.PIndex, &Case.PFile, &Case.PIV, &Case.Name, &Case.Status, &Case.AgentId, &Case.CoustomerDetails, &Case.Unknown1); err != nil {
+			PIndex           string
+			PFile            string
+			PIV              string
+			Name             string
+			Status           string
+			AgentId          string
+			CoustomerDetails string
+			Unknown1         string
+		}
+		if err := rows.Scan(&Case.PIndex, &Case.PFile, &Case.PIV, &Case.Name, &Case.Status, &Case.AgentId, &Case.CoustomerDetails, &Case.Unknown1); err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Failed to scan notifications"})
 		}
 		Cases = append(Cases, Case)
@@ -291,16 +287,16 @@ func GetCaseById(c *fiber.Ctx) error {
 func GetAllStudentReports(c *fiber.Ctx) error {
 	// Define struct type
 	type StudentReport struct {
-		Id              int   
-		Name            string 
-		Age             string 
-		Gender          string 
-		Grade           string 
-		Jaundice        string 
-		Prediction      string 
-		AsdConfidence   string 
-		VideoConfidence string 
-		FinalConfidence string 
+		Id              int
+		Name            string
+		Age             string
+		Gender          string
+		Grade           string
+		Jaundice        string
+		Prediction      string
+		AsdConfidence   string
+		VideoConfidence string
+		FinalConfidence string
 	}
 
 	var reports []StudentReport
@@ -312,7 +308,7 @@ func GetAllStudentReports(c *fiber.Ctx) error {
 	defer rows.Close()
 
 	for rows.Next() {
-		var report StudentReport 
+		var report StudentReport
 
 		if err := rows.Scan(
 			&report.Id, &report.Name, &report.Age, &report.Gender, &report.Grade, &report.Jaundice,
@@ -330,4 +326,3 @@ func GetAllStudentReports(c *fiber.Ctx) error {
 
 	return c.JSON(reports)
 }
-

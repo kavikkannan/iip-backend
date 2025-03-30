@@ -11,18 +11,15 @@ import (
 
 func main() {
 
-    config.Connect()
+	config.Connect()
 	app := fiber.New()
 	app.Use(cors.New(cors.Config{
 		AllowOrigins:     "http://localhost:3000",
 		AllowCredentials: true,
 		AllowHeaders:     "Content-Type, Authorization",
 	}))
-	
+
 	routes.Setup(app)
 
-	
-	app.Listen(":9999") 
+	app.Listen(":9999")
 }
-
-

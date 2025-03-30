@@ -5,20 +5,16 @@ import (
 	"fmt"
 	"log"
 	"time"
-
 )
-var DB *sql.DB
-	
 
+var DB *sql.DB
 
 func Connect() {
 	var err error
 
-	
+	dsn := "root:root@tcp(mysql:3306)/aimed?parseTime=true"
 
-  dsn := "root:root@tcp(mysql:3306)/aimed?parseTime=true"
- 
- DB, err = sql.Open("mysql", dsn)
+	DB, err = sql.Open("mysql", dsn)
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
@@ -34,13 +30,13 @@ func Connect() {
 	if err != nil {
 		log.Fatalf("Failed to create tables: %v", err)
 	}
-	DB.SetMaxOpenConns(25) 
-    DB.SetMaxIdleConns(25)
-    DB.SetConnMaxLifetime(5 * time.Minute)
+	DB.SetMaxOpenConns(25)
+	DB.SetMaxIdleConns(25)
+	DB.SetConnMaxLifetime(5 * time.Minute)
 }
 func createTables(db *sql.DB) error {
 	tableStatements := []string{
-		
+
 		`CREATE TABLE IF NOT EXISTS Login (
 			id INT AUTO_INCREMENT PRIMARY KEY,
 			name VARCHAR(100) NOT NULL,
@@ -66,7 +62,6 @@ func createTables(db *sql.DB) error {
 			final_confidence VARCHAR(50) NOT NULL
 
 		);`,
-
 	}
 
 	for _, stmt := range tableStatements {
